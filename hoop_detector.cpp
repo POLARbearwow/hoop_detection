@@ -79,7 +79,7 @@ HoopDetector& HoopDetector::createBinaryImage() {
     auto start = std::chrono::high_resolution_clock::now();
     
     try {
-        logIfNeeded("[HoopDetector] 开始图像处理...");
+        // logIfNeeded("[HoopDetector] 开始图像处理...");
         
         // 转换到HSV颜色空间
         cv::Mat hsv_frame;
@@ -118,7 +118,7 @@ HoopDetector& HoopDetector::processImage() {
     auto start = std::chrono::high_resolution_clock::now();
     
     try {
-        std::cout << "[HoopDetector] 开始处理图像..." << std::endl;
+        // std::cout << "[HoopDetector] 开始处理图像..." << std::endl;
         
         // 1. 直接使用binary_image_作为最终的二值图
         final_binary_ = binary_image_.clone();
@@ -126,7 +126,7 @@ HoopDetector& HoopDetector::processImage() {
         // 2. 保存中间结果供显示使用
         filtered_image_ = binary_image_.clone();  // 保存滤波后的二值图
         
-        std::cout << "[HoopDetector] 图像处理完成" << std::endl;
+        // std::cout << "[HoopDetector] 图像处理完成" << std::endl;
         
     } catch (const cv::Exception& e) {
         std::cerr << "[HoopDetector] OpenCV错误: " << e.what() << std::endl;
@@ -153,7 +153,7 @@ std::pair<cv::Point, int> HoopDetector::detectCircle() {
     auto start = std::chrono::high_resolution_clock::now();
     
     try {
-        logIfNeeded("[HoopDetector] 开始圆检测...");
+        // logIfNeeded("[HoopDetector] 开始圆检测...");
         
         // 提取所有轮廓点到一个向量中
         std::vector<cv::Point> all_contour_points;
@@ -461,11 +461,10 @@ std::pair<cv::Point, int> HoopDetector::fitCircleRANSAC(
 }
 
 void HoopDetector::initializeCameraParams() {
-    // 设置一个示例相机内参（仅用于演示，实际使用时需要根据实际相机标定结果设置）
     camera_matrix_ = (cv::Mat_<double>(3, 3) << 
-        800.0, 0.0, 320.0,
-        0.0, 800.0, 240.0,
-        0.0, 0.0, 1.0);
+        1.8047987054698410e+03, 0., 7.0794773098538269e+02, 
+        0., 1.8040138677418131e+03, 5.4521886784352614e+02, 
+        0., 0., 1. );
     
     // 假设没有畸变
     dist_coeffs_ = cv::Mat::zeros(1, 5, CV_64F);

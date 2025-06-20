@@ -264,49 +264,47 @@ bool processImage(const std::string& imagePath, HoopDetector& detector) {
 }
 
 // 处理摄像头的函数
-bool processCameraStream(HikCamera& camera, HoopDetector& detector) {
+void processCameraStream(HikCamera& camera, HoopDetector& detector) {
     cv::Mat frame;
-    while (true) {
-        std::cout << "[Main] 尝试获取新帧..." << std::endl;
-        if (camera.getFrame(frame)) {
-            if (!frame.empty()) {
-                std::cout << "[Main] 成功获取帧，开始处理..." << std::endl;
-                
-                try {
-                    // 处理图像
-                    detector.loadImage(frame)
-                           .createBinaryImage()
-                           .processImage();
+    char key = 0;
+    bool running = true;
+    int frame_count = 0;
+    const int LOG_INTERVAL = 30; // 每30帧输出一次结果
 
-                    // 检测篮筐
-                    auto [center, radius] = detector.detectCircle();
-
-                    // 显示原始图像
-                    cv::imshow("Camera", frame);
-
-                    // 显示处理步骤
-                    cv::Mat process_view = detector.showProcess();
-                    if (!process_view.empty()) {
-                        cv::imshow("Processing Steps", process_view);
-                    }
-                }
-                catch (const std::exception& e) {
-                    std::cerr << "[Main] 处理错误: " << e.what() << std::endl;
-                }
-
-                // 检查键盘输入
-                char key = cv::waitKey(1);
-                if (key == 'q') {
-                    std::cout << "[Main] 检测到退出指令" << std::endl;
-                    return true;
-                }
-            }
-        } else {
-            std::cerr << "[Main] 获取图像失败" << std::endl;
-            usleep(100000);  // 失败时等待100ms
+    while (running && key != 'q') {
+        if (!camera.getFrame(frame)) {
+            // std::cerr << "[Main] 获取图像失败" << std::endl;
+            continue;
         }
+
+        // 分开调用loadImage和processImage
+        detector.loadImage(frame);
+        detector.createBinaryImage();
+        detector.processImage();
+
+        // 检测篮筐
+        auto [center, radius] = detector.detectCircle();
+
+        // 显示结果
+        cv::imshow("Camera", frame);
+        cv::imshow("Processing Steps", detector.showProcess());
+        
+        // 获取PnP结果并定期输出
+        if (frame_count % LOG_INTERVAL == 0 && radius > 0) {
+            // 计算位姿
+            cv::Vec3f pose = detector.solvePnP(center, radius);
+            
+            // 输出位姿信息
+            std::cout << "\n=== 篮筐位姿 (第 " << frame_count << " 帧) ===" << std::endl;
+            std::cout << "位置 (米):" << std::endl;
+            std::cout << "X: " << std::fixed << std::setprecision(3) << pose[0] << std::endl;
+            std::cout << "Y: " << std::fixed << std::setprecision(3) << pose[1] << std::endl;
+            std::cout << "Z: " << std::fixed << std::setprecision(3) << pose[2] << std::endl;
+        }
+
+        frame_count++;
+        key = cv::waitKey(1);
     }
-    return true;
 }
 
 int main(int argc, char* argv[]) {

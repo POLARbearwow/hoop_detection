@@ -121,13 +121,13 @@ bool HikCamera::getFrame(cv::Mat& frame) {
     MV_FRAME_OUT stImageInfo = {0};
     memset(&stImageInfo, 0, sizeof(MV_FRAME_OUT));
 
-    std::cout << "[HikCamera] 尝试获取图像..." << std::endl;
+    // std::cout << "[HikCamera] 尝试获取图像..." << std::endl;
     int nRet = MV_CC_GetImageBuffer(handle, &stImageInfo, 1000);
     if (nRet == MV_OK) {
-        std::cout << "[HikCamera] 成功获取图像，大小: " 
-                  << stImageInfo.stFrameInfo.nWidth << "x" 
-                  << stImageInfo.stFrameInfo.nHeight 
-                  << " 像素格式: " << stImageInfo.stFrameInfo.enPixelType << std::endl;
+        // std::cout << "[HikCamera] 成功获取图像，大小: " 
+        //           << stImageInfo.stFrameInfo.nWidth << "x" 
+        //           << stImageInfo.stFrameInfo.nHeight 
+        //           << " 像素格式: " << stImageInfo.stFrameInfo.enPixelType << std::endl;
 
         if (stImageInfo.pBufAddr == nullptr) {
             std::cerr << "[HikCamera] 图像缓冲区指针为空!" << std::endl;
@@ -150,7 +150,7 @@ bool HikCamera::getFrame(cv::Mat& frame) {
                 return false;
             }
 
-            std::cout << "[HikCamera] 图像复制成功" << std::endl;
+            // std::cout << "[HikCamera] 图像复制成功" << std::endl;
         }
         catch (const cv::Exception& e) {
             std::cerr << "[HikCamera] OpenCV错误: " << e.what() << std::endl;
