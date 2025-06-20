@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from circle_detector import CircleDetector
+from validation.circle_detector import CircleDetector
 import time
 
 class HoopDetector:

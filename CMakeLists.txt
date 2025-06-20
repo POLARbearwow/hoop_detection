@@ -11,17 +11,22 @@ find_package(OpenCV REQUIRED)
 # 添加海康相机SDK的头文件路径
 include_directories(/opt/MVS/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${OpenCV_INCLUDE_DIRS})
+
 
 # 添加所有源文件
 add_executable(hoop_detector
     main.cpp
+    hik_camera.cpp
     hoop_detector.cpp
-    circle_detector.cpp
+    camera_calibrator.cpp
+    image_saver.cpp
 )
 
 # 链接OpenCV库和海康相机SDK
 target_link_libraries(hoop_detector 
     ${OpenCV_LIBS}
+
     /opt/MVS/lib/64/libMvCameraControl.so
 )
 

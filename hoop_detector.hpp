@@ -4,11 +4,11 @@
 #include <chrono>
 #include <map>
 #include <string>
-#include "circle_detector.hpp"
+#include <vector>
 
 class HoopDetector {
 public:
-    HoopDetector(int kernel_size, double solidity_threshold, double min_score);
+    HoopDetector(int kernel_size = 5, double solidity_threshold = 1.0, double min_score = 0.7);
     
     // 加载和处理图像
     HoopDetector& loadImage(const std::string& image_path);
@@ -38,6 +38,11 @@ public:
 
     void resetTiming();
 
+    // 新增PnP相关函数
+    void initializeCameraParams();
+    cv::Vec3f solvePnP(const cv::Point& center, int radius);
+    void setCameraParams(const cv::Mat& camera_matrix, const cv::Mat& dist_coeffs);
+
 private:
     // 新增：日志控制相关
     std::chrono::steady_clock::time_point last_log_time_;
@@ -53,7 +58,9 @@ private:
         float threshold_dist = 8.0);
     
     // 成员变量
-    CircleDetector circle_detector_;
+    // CircleDetector circle_detector_;
+    // HoopDetector circle_detector_;
+    // std::unique_ptr<HoopDetector> circle_detector_; 
     int kernel_size_;
     double solidity_threshold_;
     cv::Mat kernel_;
@@ -78,4 +85,12 @@ private:
     
     // 时间统计
     std::map<std::string, double> timing_;
+
+    // 相机参数
+    cv::Mat camera_matrix_;
+    cv::Mat dist_coeffs_;
+    const double HOOP_DIAMETER_METERS = 0.45;  // 篮筐直径（米）
+    
+    // 辅助函数
+    void getRPY(const cv::Mat& R, double& roll, double& pitch, double& yaw);
 }; 

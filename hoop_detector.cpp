@@ -14,8 +14,7 @@ void HoopDetector::logIfNeeded(const std::string& message) {
 }
 
 HoopDetector::HoopDetector(int kernel_size, double solidity_threshold, double min_score)
-    : circle_detector_(6, min_score)
-    , kernel_size_(kernel_size)
+    :kernel_size_(kernel_size)
     , solidity_threshold_(solidity_threshold)
     , last_save_time_(std::chrono::steady_clock::now())
     , last_log_time_(std::chrono::steady_clock::now()) {
@@ -36,7 +35,7 @@ HoopDetector& HoopDetector::loadImage(const std::string& image_path) {
     if (original_image_.empty()) {
         throw std::runtime_error("Failed to load image from " + image_path);
     }
-    circle_detector_.loadImage(original_image_);
+    // circle_detector_.loadImage(original_image_);
     
     auto end = std::chrono::high_resolution_clock::now();
     timing_["load_image"] = std::chrono::duration<double>(end - start).count();
@@ -64,7 +63,7 @@ HoopDetector& HoopDetector::loadImage(const cv::Mat& image) {
         original_image_ = image.clone();
     }
     
-    circle_detector_.loadImage(original_image_);
+    // circle_detector_.loadImage(original_image_);
     
     auto end = std::chrono::high_resolution_clock::now();
     timing_["load_image"] = std::chrono::duration<double>(end - start).count();
@@ -170,64 +169,97 @@ std::pair<cv::Point, int> HoopDetector::detectCircle() {
         
         logIfNeeded("[HoopDetector] 总共提取了 " + std::to_string(all_contour_points.size()) + " 个轮廓点");
         
-        
         // 在原始图像和二值图上绘制结果
         result_image_ = original_image_.clone();
         cv::Mat binary_result;
         cv::cvtColor(final_binary_, binary_result, cv::COLOR_GRAY2BGR);
-        
-        // // 找到最大的轮廓
-        // int max_contour_idx = -1;
-        // int max_contour_size = 0;
-        // for (size_t i = 0; i < contours.size(); i++) {
-        //     int size = contours[i].size();
-        //     if (size > max_contour_size) {
-        //         max_contour_size = size;
-        //         max_contour_idx = i;
-        //     }
-        // }
-        
-        // if (max_contour_idx >= 0) {
-            // 使用RANSAC拟合圆
 
-            auto result = fitCircleRANSAC(all_contour_points);
-            auto center = result.first;
-            auto radius = result.second;
-            
-            if (radius > 0) {
-                logIfNeeded(
-                    "[HoopDetector] 检测结果: 中心=(" + std::to_string(center.x) + "," + 
-                    std::to_string(center.y) + ") 半径=" + std::to_string(radius)
-                );
-                
-                // 在原始图像上绘制加粗的圆和更大的圆心
-                cv::circle(result_image_, center, radius, cv::Scalar(0, 255, 0), 4);
-                cv::circle(result_image_, center, 5, cv::Scalar(0, 0, 255), -1);
-                
-                // 在二值图上也绘制加粗的圆和更大的圆心
-                cv::circle(binary_result, center, radius, cv::Scalar(0, 255, 0), 4);
-                cv::circle(binary_result, center, 5, cv::Scalar(0, 0, 255), -1);
-                
-                // 更新final_binary_为带有拟合结果的图像
-                cv::cvtColor(binary_result, final_binary_, cv::COLOR_BGR2GRAY);
-                
-                auto end = std::chrono::high_resolution_clock::now();
-                timing_["detect_circle"] = std::chrono::duration<double>(end - start).count();
-                
-                // 计算并输出性能统计
-                double total_time = 0;
-                for (const auto& [_, duration] : timing_) {
-                    total_time += duration;
-                }
-                
-                logIfNeeded(
-                    "[HoopDetector] 性能统计: 总耗时=" + std::to_string(total_time * 1000) + 
-                    "ms, FPS=" + std::to_string(1.0 / total_time)
-                );
-                
-                return std::make_pair(center, radius);
-            }
+        auto result = fitCircleRANSAC(all_contour_points);
+        auto center = result.first;
+        auto radius = result.second;
         
+        if (radius > 0) {
+            logIfNeeded(
+                "[HoopDetector] 检测结果: 中心=(" + std::to_string(center.x) + "," + 
+                std::to_string(center.y) + ") 半径=" + std::to_string(radius)
+            );
+            
+            // 计算四个特征点（上下左右）
+            cv::Point top(center.x, center.y - radius);
+            cv::Point bottom(center.x, center.y + radius);
+            cv::Point left(center.x - radius, center.y);
+            cv::Point right(center.x + radius, center.y);
+            
+            // 在原始图像上绘制
+            // 1. 绘制圆和圆心
+            cv::circle(result_image_, center, radius, cv::Scalar(0, 255, 0), 4);
+            cv::circle(result_image_, center, 8, cv::Scalar(0, 0, 255), -1);
+            
+            // 2. 绘制四个特征点（使用不同颜色）
+            cv::circle(result_image_, top, 6, cv::Scalar(255, 0, 0), -1);
+            cv::circle(result_image_, bottom, 6, cv::Scalar(255, 0, 0), -1);
+            cv::circle(result_image_, left, 6, cv::Scalar(255, 0, 0), -1);
+            cv::circle(result_image_, right, 6, cv::Scalar(255, 0, 0), -1);
+            
+            // 3. 添加坐标标注
+            std::string center_text = "C(" + std::to_string(center.x) + "," + std::to_string(center.y) + ")";
+            std::string top_text = "T(" + std::to_string(top.x) + "," + std::to_string(top.y) + ")";
+            std::string bottom_text = "B(" + std::to_string(bottom.x) + "," + std::to_string(bottom.y) + ")";
+            std::string left_text = "L(" + std::to_string(left.x) + "," + std::to_string(left.y) + ")";
+            std::string right_text = "R(" + std::to_string(right.x) + "," + std::to_string(right.y) + ")";
+            
+            // 设置文本参数
+            int font = cv::FONT_HERSHEY_SIMPLEX;
+            double font_scale = 0.6;
+            int thickness = 2;
+            cv::Scalar text_color(255, 255, 255);
+            
+            // 绘制文本（带黑色边框以提高可读性）
+            auto drawText = [&](const std::string& text, const cv::Point& point) {
+                cv::putText(result_image_, text, 
+                           cv::Point(point.x + 10, point.y + 10), 
+                           font, font_scale, cv::Scalar(0, 0, 0), thickness + 1);
+                cv::putText(result_image_, text, 
+                           cv::Point(point.x + 10, point.y + 10), 
+                           font, font_scale, text_color, thickness);
+            };
+            
+            drawText(center_text, center);
+            drawText(top_text, top);
+            drawText(bottom_text, bottom);
+            drawText(left_text, left);
+            drawText(right_text, right);
+            
+            // 在二值图上也绘制相同的标注
+            cv::circle(binary_result, center, radius, cv::Scalar(0, 255, 0), 4);
+            cv::circle(binary_result, center, 8, cv::Scalar(0, 0, 255), -1);
+            cv::circle(binary_result, top, 6, cv::Scalar(255, 0, 0), -1);
+            cv::circle(binary_result, bottom, 6, cv::Scalar(255, 0, 0), -1);
+            cv::circle(binary_result, left, 6, cv::Scalar(255, 0, 0), -1);
+            cv::circle(binary_result, right, 6, cv::Scalar(255, 0, 0), -1);
+            
+            // 更新final_binary_为带有拟合结果的图像
+            cv::cvtColor(binary_result, final_binary_, cv::COLOR_BGR2GRAY);
+            
+            // 执行PnP解算
+            cv::Vec3f position = solvePnP(center, radius);
+            
+            auto end = std::chrono::high_resolution_clock::now();
+            timing_["detect_circle"] = std::chrono::duration<double>(end - start).count();
+            
+            // 计算并输出性能统计
+            double total_time = 0;
+            for (const auto& [_, duration] : timing_) {
+                total_time += duration;
+            }
+            
+            logIfNeeded(
+                "[HoopDetector] 性能统计: 总耗时=" + std::to_string(total_time * 1000) + 
+                "ms, FPS=" + std::to_string(1.0 / total_time)
+            );
+            
+            return std::make_pair(center, radius);
+        }
         
         logIfNeeded("[HoopDetector] 未检测到圆");
         return std::make_pair(cv::Point(0, 0), 0);
@@ -426,4 +458,103 @@ std::pair<cv::Point, int> HoopDetector::fitCircleRANSAC(
     }
 
     return std::make_pair(best_center, best_radius);
+}
+
+void HoopDetector::initializeCameraParams() {
+    // 设置一个示例相机内参（仅用于演示，实际使用时需要根据实际相机标定结果设置）
+    camera_matrix_ = (cv::Mat_<double>(3, 3) << 
+        800.0, 0.0, 320.0,
+        0.0, 800.0, 240.0,
+        0.0, 0.0, 1.0);
+    
+    // 假设没有畸变
+    dist_coeffs_ = cv::Mat::zeros(1, 5, CV_64F);
+    
+    std::cout << "[HoopDetector] 相机参数初始化完成" << std::endl;
+    std::cout << "相机内参矩阵:\n" << camera_matrix_ << std::endl;
+}
+
+void HoopDetector::setCameraParams(const cv::Mat& camera_matrix, const cv::Mat& dist_coeffs) {
+    camera_matrix_ = camera_matrix.clone();
+    dist_coeffs_ = dist_coeffs.clone();
+}
+
+void HoopDetector::getRPY(const cv::Mat& R, double& roll, double& pitch, double& yaw) {
+    // 从旋转矩阵计算欧拉角
+    roll = atan2(R.at<double>(2,1), R.at<double>(2,2));
+    pitch = atan2(-R.at<double>(2,0), 
+                  sqrt(R.at<double>(2,1)*R.at<double>(2,1) + R.at<double>(2,2)*R.at<double>(2,2)));
+    yaw = atan2(R.at<double>(1,0), R.at<double>(0,0));
+    
+    // 转换为角度
+    roll = roll * 180.0 / CV_PI;
+    pitch = pitch * 180.0 / CV_PI;
+    yaw = yaw * 180.0 / CV_PI;
+}
+
+cv::Vec3f HoopDetector::solvePnP(const cv::Point& center, int radius) {
+    if (camera_matrix_.empty()) {
+        initializeCameraParams();
+    }
+    
+    try {
+        // 构建3D空间点（假设篮筐在世界坐标系原点，平面平行于XY平面）
+        std::vector<cv::Point3f> object_points;
+        const float RADIUS = HOOP_DIAMETER_METERS / 2.0;
+        object_points.push_back(cv::Point3f(0, RADIUS, 0));   // 上
+        object_points.push_back(cv::Point3f(0, -RADIUS, 0));  // 下
+        object_points.push_back(cv::Point3f(-RADIUS, 0, 0));  // 左
+        object_points.push_back(cv::Point3f(RADIUS, 0, 0));   // 右
+
+        // 构建对应的图像点
+        std::vector<cv::Point2f> image_points;
+        image_points.push_back(cv::Point2f(center.x, center.y - radius)); // 上
+        image_points.push_back(cv::Point2f(center.x, center.y + radius)); // 下
+        image_points.push_back(cv::Point2f(center.x - radius, center.y)); // 左
+        image_points.push_back(cv::Point2f(center.x + radius, center.y)); // 右
+
+        // 求解PnP
+        cv::Mat rvec, tvec;
+        bool success = cv::solvePnP(object_points, image_points, 
+                                  camera_matrix_, dist_coeffs_, 
+                                  rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
+
+        if (success) {
+            // 将旋转向量转换为旋转矩阵
+            cv::Mat R;
+            cv::Rodrigues(rvec, R);
+            
+            // 计算欧拉角
+            double roll, pitch, yaw;
+            getRPY(R, roll, pitch, yaw);
+            
+            // 计算距离
+            double distance = cv::norm(tvec);
+            
+            // 输出结果
+            std::cout << "\n=== PnP解算结果 ===" << std::endl;
+            std::cout << "位置 (meters):" << std::endl;
+            std::cout << "X: " << tvec.at<double>(0) << std::endl;
+            std::cout << "Y: " << tvec.at<double>(1) << std::endl;
+            std::cout << "Z: " << tvec.at<double>(2) << std::endl;
+            std::cout << "距离: " << distance << " meters" << std::endl;
+            std::cout << "\n姿态 (degrees):" << std::endl;
+            std::cout << "Roll : " << roll << std::endl;
+            std::cout << "Pitch: " << pitch << std::endl;
+            std::cout << "Yaw  : " << yaw << std::endl;
+            std::cout << "===================" << std::endl;
+            
+            return cv::Vec3f(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2));
+        } else {
+            std::cerr << "[HoopDetector] PnP求解失败" << std::endl;
+            return cv::Vec3f(0, 0, 0);
+        }
+        
+    } catch (const cv::Exception& e) {
+        std::cerr << "[HoopDetector] OpenCV错误: " << e.what() << std::endl;
+        return cv::Vec3f(0, 0, 0);
+    } catch (const std::exception& e) {
+        std::cerr << "[HoopDetector] 标准错误: " << e.what() << std::endl;
+        return cv::Vec3f(0, 0, 0);
+    }
 } 
